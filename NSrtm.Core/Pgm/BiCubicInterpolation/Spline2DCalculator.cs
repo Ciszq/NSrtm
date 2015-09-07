@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using JetBrains.Annotations;
 
 namespace NSrtm.Core.Pgm.BiCubicInterpolation
 {
@@ -22,19 +23,19 @@ namespace NSrtm.Core.Pgm.BiCubicInterpolation
             var derivative = new List<double>();
             for (int i = 1; i < length - 1; i++)
             {
-                derivative[i - 1] = centeredDifferencingFormula(values[i - 1], values[i + 1], step);
+                derivative.Add(centeredDifferencingFormula(values[i - 1], values[i + 1], step));
             }
             return derivative;
         }
 
         private static double centeredDifferencingFormula(double previous, double next, double step)
         {
-            return (previous - next) / 2 * step;
+            return (next - previous) / 2 * step;
         }
 
         #region Static Members
 
-        private static readonly int[,] linearEquationCoefficients =
+        private static readonly int[,] _linearEquationCoefficients =
 
         {
             {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -61,8 +62,10 @@ namespace NSrtm.Core.Pgm.BiCubicInterpolation
         /// <param name="values">function values, array[0..3, 0..3]</param>
         /// <param name="step">Distance between the nodes</param>
         /// <returns>Func with spline interpolant</returns>
-        public static Func<double, double, double> GetBiCubicSpline(IReadOnlyList<IReadOnlyList<double>> values, double step)
+        public static Func<double, double, double> GetBiCubicSpline([NotNull] IReadOnlyList<IReadOnlyList<double>> values, double step)
         {
+            if (values == null) throw new ArgumentNullException("values");
+            if(step <= 0) throw new ArgumentOutOfRangeException("step", "Step must be positive");
             if (values.Count != 4 || values.Any(value => value.Count != 4))
             {
                 throw new ArgumentException("values", "Bicubic interpolation considers 16 pixels(4×4)");
@@ -76,9 +79,13 @@ namespace NSrtm.Core.Pgm.BiCubicInterpolation
                                          .Select(column => firstDerivativesCalculator(column.ToList(), step))
                                          .ToList()
                                          .AsReadOnly();
+            var crossDerivative = new List<List<double>>();
+            for (int i = 0; i < firstDerivativeY[0].Count; i++)
+            {
+                var col = firstDerivativeY.Select(p => p[i]);
+                crossDerivative.Add(firstDerivativesCalculator(col.ToList(), step));
 
-            var crossDerivative = firstDerivativeY.Select(row => firstDerivativesCalculator(row, step))
-                                                  .ToList();
+            }
 
             var x = new List<double>
                     {
@@ -102,25 +109,30 @@ namespace NSrtm.Core.Pgm.BiCubicInterpolation
 
             var coefficients = new List<double>();
 
-            for (int i = 0; i < linearEquationCoefficients.GetLength(0); i++)
+            for (int i = 0; i < _linearEquationCoefficients.GetLength(0); i++)
             {
-                double coefficient = x.Select((t, j) => linearEquationCoefficients[i, j] * t)
+                double coefficient = x.Select((t, j) => _linearEquationCoefficients[i, j] * t)
                                       .Sum();
                 coefficients.Add(coefficient);
             }
 
             return ((xPos, yPos) =>
                     {
-                        double result = 0;
-                        for (int i = 0; i < 4; i++)
-                        {
-                            for (int j = 0; j < 4; i++)
-                            {
-                                result += coefficients[i * 4 + j] * Math.Pow(xPos, i) * Math.Pow(yPos, j);
-                            }
-                        }
-                        return result;
+                        return fromPoly(coefficients, xPos, yPos);
                     });
+        }
+
+        private static double fromPoly(List<double> coefficients, double xPos, double yPos)
+        {
+            double result = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                for (int j = 0; j < 4; j++)
+                {
+                    result += coefficients[i * 4 + j] * Math.Pow(xPos, j) * Math.Pow(yPos, i);
+                }
+            }
+            return result;
         }
 
         #endregion
