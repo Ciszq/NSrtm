@@ -33,6 +33,19 @@ namespace NSrtm.Core.Pgm.BiCubicInterpolation
             return (next - previous) / 2 * step;
         }
 
+        private static double fromCoefficentsPoly(List<double> coefficients, double xPos, double yPos)
+        {
+            double result = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                for (int j = 0; j < 4; j++)
+                {
+                    result += coefficients[i * 4 + j] * Math.Pow(xPos, j) * Math.Pow(yPos, i);
+                }
+            }
+            return result;
+        }
+
         #region Static Members
 
         private static readonly int[,] _linearEquationCoefficients =
@@ -65,7 +78,7 @@ namespace NSrtm.Core.Pgm.BiCubicInterpolation
         public static Func<double, double, double> GetBiCubicSpline([NotNull] IReadOnlyList<IReadOnlyList<double>> values, double step)
         {
             if (values == null) throw new ArgumentNullException("values");
-            if(step <= 0) throw new ArgumentOutOfRangeException("step", "Step must be positive");
+            if (step <= 0) throw new ArgumentOutOfRangeException("step", "Step must be positive");
             if (values.Count != 4 || values.Any(value => value.Count != 4))
             {
                 throw new ArgumentException("values", "Bicubic interpolation considers 16 pixels(4×4)");
@@ -84,7 +97,6 @@ namespace NSrtm.Core.Pgm.BiCubicInterpolation
             {
                 var col = firstDerivativeY.Select(p => p[i]);
                 crossDerivative.Add(firstDerivativesCalculator(col.ToList(), step));
-
             }
 
             var x = new List<double>
@@ -116,23 +128,7 @@ namespace NSrtm.Core.Pgm.BiCubicInterpolation
                 coefficients.Add(coefficient);
             }
 
-            return ((xPos, yPos) =>
-                    {
-                        return fromPoly(coefficients, xPos, yPos);
-                    });
-        }
-
-        private static double fromPoly(List<double> coefficients, double xPos, double yPos)
-        {
-            double result = 0;
-            for (int i = 0; i < 4; i++)
-            {
-                for (int j = 0; j < 4; j++)
-                {
-                    result += coefficients[i * 4 + j] * Math.Pow(xPos, j) * Math.Pow(yPos, i);
-                }
-            }
-            return result;
+            return ((xPos, yPos) => fromCoefficentsPoly(coefficients, xPos, yPos));
         }
 
         #endregion
