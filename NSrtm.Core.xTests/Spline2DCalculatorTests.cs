@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using NSrtm.Core.Pgm.BiCubicInterpolation;
 using Xunit;
+using KellermanSoftware.CompareNetObjects;
 
 namespace NSrtm.Core.xTests
 {
@@ -11,8 +12,9 @@ namespace NSrtm.Core.xTests
         public void BicubicSplineCalculatorReturnSimilarResultToExternalData(List<List<double>> values, double step)
         {
             var spline = Spline2DCalculator.GetBiCubicSpline(values, step);
-            var result = spline(2.05, 2.2);
-            Assert.Equal(result, 29.5);
+            var result = spline(0.55, 0.7);
+            AssertDeep.Equal(result, 29.5, config => config.DoublePrecision = 1e-1 );
+
         }
 
         #region Static Members
